@@ -53,8 +53,8 @@ h3{font-size:13px;margin:14px 0 8px;color:var(--acc);text-transform:uppercase;le
 /* ---------- impression ---------- */
 #print{display:none}
 @media print{
-  @page{size:A4;margin:10mm}
-  body{background:#fff}
+  @page{size:A4;margin:0} html,body{margin:0;padding:0;background:#fff}
+  #print .page{width:210mm;padding:10mm;min-height:290mm}
   #app,#loginBox,#setupBox,#toast{display:none!important}
   #print{display:block}
   .page{page-break-after:always}
