@@ -543,9 +543,18 @@ async function mailDoc(){
   const files=[new File([fb],pdfName('fac',d),{type:'application/pdf'}),new File([bb],pdfName('bl',d),{type:'application/pdf'})];
   const mobile=/Android|iPhone|iPad/i.test(navigator.userAgent);
   if(mobile&&navigator.canShare&&navigator.canShare({files})){try{await navigator.share({files,title:subj,text:body});return}catch(e){if(e.name==='AbortError')return}}
-  files.forEach(f=>saveBlob(f,f.name));
-  setTimeout(()=>{location.href='mailto:'+encodeURIComponent(d.email||'')+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body)},600);
-  toast('Les 2 PDF sont téléchargés — joignez-les à l\'e-mail');
+  const eml=await buildEml(d.email||'',subj,body,files);
+  saveBlob(new Blob([eml],{type:'message/rfc822'}),'EMAIL-'+pdfName('fac',d).replace(/\.pdf$/,'')+'.eml');
+  toast('Ouvrez le fichier .eml téléchargé : il s\'ouvre dans Outlook avec la facture et le BL en pièces jointes');
+}
+function b64(buf){let s='';const u=new Uint8Array(buf);for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s).replace(/.{76}/g,'$&\r\n')}
+function encH(t){return '=?UTF-8?B?'+btoa(unescape(encodeURIComponent(t)))+'?='}
+async function buildEml(to,subj,body,files){
+  const B='----=_RIM_'+Date.now();const L='\r\n';
+  let m='X-Unsent: 1'+L+'To: '+to+L+'Subject: '+encH(subj)+L+'MIME-Version: 1.0'+L+'Content-Type: multipart/mixed; boundary="'+B+'"'+L+L;
+  m+='--'+B+L+'Content-Type: text/plain; charset="utf-8"'+L+'Content-Transfer-Encoding: base64'+L+L+b64(new TextEncoder().encode(body.replace(/\n/g,'\r\n')))+L;
+  for(const f of files){m+='--'+B+L+'Content-Type: application/pdf; name="'+encH(f.name)+'"'+L+'Content-Transfer-Encoding: base64'+L+'Content-Disposition: attachment; filename="'+encH(f.name)+'"'+L+L+b64(await f.arrayBuffer())+L}
+  return m+'--'+B+'--'+L;
 }
 function printDoc(w){
   const d=readForm();d.lines=cur.data.lines;
