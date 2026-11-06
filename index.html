@@ -90,9 +90,9 @@ table.bl th{font-weight:400}
 .sig .sub{text-align:center;font-size:9px;margin-top:6px}
 .pg{text-align:center;font-size:10px;margin-top:60px}
 .ib{display:flex;justify-content:space-between;gap:12px;margin-bottom:28px}
-.ib .cl{font-size:10.5px;width:48%}
+.ib .cl{font-size:10.5px;width:46%}
 .ib .cl b{font-weight:700}
-.ib .fx{width:54%;border:1px solid #000;padding:2px}
+.ib .fx{width:52%;border:1px solid #000;padding:2px}
 .ib .fx .t{background:#ddd;border:1px solid #999;font-weight:700;font-size:15px;text-decoration:underline;padding:2px 4px}
 .ib .fx table{width:100%;font-size:13px;font-weight:700;border-collapse:collapse}
 .ib .fx td{padding:7px 4px}
@@ -529,30 +529,40 @@ function editCur(){loadDocForm();tab('edit')}
 function pdfName(w,d){return (w==='bl'?'BL-':'INVOICE-')+(d.num||'').slice(-4)+'-'+(d.date||'').slice(0,4)+'-'+(d.client||'').replace(/[\\/:*?"<>|]/g,'')+'.pdf'}
 async function pdfBlob(w,d){
   if(!window.html2pdf){toast('Chargement PDF impossible, vérifiez Internet');throw new Error('html2pdf')}
-  const box=$('pdfBox');box.innerHTML=w==='bl'?pageBL(d):pageFac(d);const el=box.firstElementChild;
-  try{return await html2pdf().set({margin:10,image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#fff'},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css']}}).from(el).outputPdf('blob')}
-  finally{box.innerHTML=''}
+  const html='<div style="width:194mm;background:#fff;padding:0 2mm;box-sizing:border-box">'+(w==='bl'?pageBL(d):pageFac(d)).replace('class="page"','class="page" style="min-height:0;width:190mm"')+'</div>';
+  const sy=window.scrollY;window.scrollTo(0,0);
+  try{return await html2pdf().set({margin:[10,8,10,8],image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#fff',scrollX:0,scrollY:0},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}}).from(html,'string').outputPdf('blob')}
+  finally{window.scrollTo(0,sy)}
 }
 function saveBlob(b,name){const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)}
 async function dlPdf(w){const d=curDoc();toast('Préparation du PDF…');try{saveBlob(await pdfBlob(w,d),pdfName(w,d))}catch(e){console.error(e)}}
 async function mailDoc(){
   const d=curDoc();toast('Préparation des PDF…');let fb,bb;
   try{fb=await pdfBlob('fac',d);bb=await pdfBlob('bl',d)}catch(e){console.error(e);return}
-  const subj='Facture et BL '+(d.num||'')+' — '+(S.name||'');
-  const body='Bonjour,\n\nVeuillez trouver ci-joint la facture et le bon de livraison N° '+(d.num||'')+' du '+frDate(d.date)+'.\n\nCordialement,\n'+(d.etab||'')+'\n'+(S.name||'');
+  const t=totals(d),cur3=(d.dev||'EUR');
+  const subj='Invoice & Delivery Note '+(d.num||'')+' – '+(d.client||'');
+  const info=[['Invoice / Delivery Note No.',d.num],['Date',frDate(d.date)],['Customer',d.client],['Customer PO No.',d.bc],['Part Number',d.part],['Amount',fmt(t.net)+' '+cur3]].filter(x=>x[1]);
+  const body='Dear Shabeer,\n\nPlease find attached the requested file.\n\n'+info.map(x=>x[0]+' : '+x[1]).join('\n')+'\n\nShould you need any further information, please do not hesitate to contact me.\n\nBest regards,\n';
+  const F='font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#1f1f1f';
+  const html='<html><body style="'+F+'"><p style="margin:0 0 12px">Dear Shabeer,</p><p style="margin:0 0 14px">Please find attached the requested file.</p>'
+   +'<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 16px;'+F+'">'+info.map(x=>'<tr><td style="padding:5px 14px;background:#f2f5f9;border:1px solid #d9e0ea;font-weight:bold;white-space:nowrap">'+esc(x[0])+'</td><td style="padding:5px 14px;border:1px solid #d9e0ea">'+esc(x[1])+'</td></tr>').join('')+'</table>'
+   +'<p style="margin:0 0 14px">Should you need any further information, please do not hesitate to contact me.</p><p style="margin:0">Best regards,</p><br></body></html>';
   const files=[new File([fb],pdfName('fac',d),{type:'application/pdf'}),new File([bb],pdfName('bl',d),{type:'application/pdf'})];
   const mobile=/Android|iPhone|iPad/i.test(navigator.userAgent);
   if(mobile&&navigator.canShare&&navigator.canShare({files})){try{await navigator.share({files,title:subj,text:body});return}catch(e){if(e.name==='AbortError')return}}
-  const eml=await buildEml(d.email||'',subj,body,files);
+  const eml=await buildEml(d.email||'',subj,body,files,html);
   saveBlob(new Blob([eml],{type:'message/rfc822'}),'EMAIL-'+pdfName('fac',d).replace(/\.pdf$/,'')+'.eml');
   toast('Ouvrez le fichier .eml téléchargé : il s\'ouvre dans Outlook avec la facture et le BL en pièces jointes');
 }
 function b64(buf){let s='';const u=new Uint8Array(buf);for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s).replace(/.{76}/g,'$&\r\n')}
 function encH(t){return '=?UTF-8?B?'+btoa(unescape(encodeURIComponent(t)))+'?='}
-async function buildEml(to,subj,body,files){
-  const B='----=_RIM_'+Date.now();const L='\r\n';
+async function buildEml(to,subj,body,files,html){
+  const B='----=_RIM_'+Date.now(),A=B+'_alt';const L='\r\n';
   let m='X-Unsent: 1'+L+'To: '+to+L+'Subject: '+encH(subj)+L+'MIME-Version: 1.0'+L+'Content-Type: multipart/mixed; boundary="'+B+'"'+L+L;
-  m+='--'+B+L+'Content-Type: text/plain; charset="utf-8"'+L+'Content-Transfer-Encoding: base64'+L+L+b64(new TextEncoder().encode(body.replace(/\n/g,'\r\n')))+L;
+  m+='--'+B+L+'Content-Type: multipart/alternative; boundary="'+A+'"'+L+L;
+  m+='--'+A+L+'Content-Type: text/plain; charset="utf-8"'+L+'Content-Transfer-Encoding: base64'+L+L+b64(new TextEncoder().encode(body.replace(/\n/g,'\r\n')))+L;
+  if(html)m+='--'+A+L+'Content-Type: text/html; charset="utf-8"'+L+'Content-Transfer-Encoding: base64'+L+L+b64(new TextEncoder().encode(html))+L;
+  m+='--'+A+'--'+L;
   for(const f of files){m+='--'+B+L+'Content-Type: application/pdf; name="'+encH(f.name)+'"'+L+'Content-Transfer-Encoding: base64'+L+'Content-Disposition: attachment; filename="'+encH(f.name)+'"'+L+L+b64(await f.arrayBuffer())+L}
   return m+'--'+B+'--'+L;
 }
