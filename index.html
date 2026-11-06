@@ -83,7 +83,7 @@ table.bl{width:100%;border-collapse:collapse}
 table.bl td,table.bl th{border:1px solid #000;padding:4px 3px;font-size:10.5px;height:22px}
 table.bl th{font-weight:400}
 .conf{font-size:10px;margin:14px 0 10px}
-.notes{font-family:'Times New Roman',serif;font-size:15px;margin:12px 0 0 75px;white-space:pre-line}
+.notes{font-family:Arial,Helvetica,sans-serif;font-size:10.5px;font-weight:700;margin:12px 0 0 calc(11% + 3px);line-height:1.7;white-space:pre-line}
 .sig{display:grid;grid-template-columns:1fr 1fr;row-gap:60px;column-gap:20px;font-size:11px;margin-top:180px;padding:0 30px}
 .sig .ln{display:flex;align-items:flex-end;gap:10px}
 .sig .ln span.u{flex:1;border-bottom:1px solid #000;height:14px}
@@ -101,7 +101,7 @@ table.it th{border:1px solid #000;padding:9px 4px;font-size:13px}
 table.it td{border-left:1px solid #000;border-right:1px solid #000;padding:6px 4px;font-size:10.5px;font-weight:700}
 table.it tbody tr:last-child td{border-bottom:1px solid #000;padding-bottom:16px}
 .ft{display:flex}
-.ft .lf{flex:1;font-weight:700;font-size:10.5px;padding:8px 30px;white-space:pre-line}
+.ft .lf{flex:1;font-weight:700;font-size:10.5px;padding:10px 6px 8px calc(5% + 4px);line-height:1.7;white-space:pre-line}
 .ft .rt{width:250px;border-left:1px solid #000;border-right:1px solid #000;font-weight:700;font-size:13px}
 .ft .rt div{display:flex;justify-content:space-between;padding:1px 4px}
 .ft .rt div span:first-child{flex:1;text-align:right;padding-right:16px}
@@ -476,7 +476,7 @@ function lettres(n,dev){
 /* ---------- impression ---------- */
 function head(inv){return `<div class="hd ${inv?'inv':''}"><img class="rl" src="${logo()}"><img class="sgs" src="${cert()}">
 <div class="nm">${esc(S.name)}</div><div class="sm ${inv?'sm1':''}">${esc(S.act)}</div><div class="sm">${esc(S.grp)}<br>${esc(S.adr)}<br>${esc(S.ids)}<br>${esc(S.tel)}</div></div>`}
-function notesTxt(d,withOrigin){const a=[];if(withOrigin&&d.origin)a.push('Country of Origin of material : '+d.origin);if(withOrigin&&d.origin)a.push('');
+function notesTxt(d,withOrigin){const a=[];if(withOrigin&&d.origin)a.push('Country of Origin of material : '+d.origin);
   if(d.qnet)a.push('Total Quantity net : '+d.qnet);if(d.qbrut)a.push('Total Quantity brut : '+d.qbrut);if(d.colis)a.push('Colisage : '+d.colis);if(d.rem)a.push(d.rem);return a.join('\n')}
 function pageBL(d){
   const adr=d.adrBl||(d.adr||'').split('\n').filter(x=>x.trim()).slice(1).join(' ')||(d.adr||'').replace(/\n/g,' ');
@@ -494,7 +494,7 @@ function pageBL(d){
 <table class="bl"><colgroup><col style="width:11%"><col style="width:33%"><col style="width:13%"><col style="width:13%"><col style="width:15%"><col style="width:15%"></colgroup>
 <tr><th>S.No.</th><th>DESCRIPTION</th><th>Lot Number</th><th>Nombre</th><th>Qte Globale</th><th>Packing Details</th></tr>
 ${lines.map(l=>`<tr><td></td><td>${esc(l.des)}</td><td>${esc(l.lot)}</td><td style="text-align:center">${esc(l.unit)}</td><td style="text-align:center">${esc(l.qty)} ${esc((l.unit||'').toLowerCase())}</td><td style="text-align:center">${esc(l.pack)}</td></tr>`).join('')}</table>
-<div class="notes">${esc(notesTxt(d,false))}</div>
+<div class="notes">${esc(notesTxt(d,true))}</div>
 <div class="sig">
 <div><div class="ln">Chargé par<span class="u"></span></div><div class="sub">(Sign,Date)</div></div>
 <div><div class="ln">Visa du client :<span class="u"></span></div><div class="sub">(Name,Sign,Date)</div></div>
@@ -508,7 +508,7 @@ function pageFac(d){
   return `<div class="page">${head(true)}<div class="hrule"></div>
 <div class="ib"><div class="cl" style="padding-top:12px"><b>${esc(d.client)}</b><br>${adrL.length?'<b>'+esc(adrL[0])+'</b><br>':''}${esc(d.ice)}<br>${adrL.slice(1).map(esc).join('<br>')}
 <br><br><b>Tel :&nbsp;&nbsp; ${esc(d.tel||'')}</b><br><b>Fax :&nbsp;&nbsp; ${esc(d.fax||'')}</b><br><br>
-<span style="font-size:13px"><b>Code client&nbsp;&nbsp; ${esc(d.code)}</b></span>${d.part?`<br><b style="margin-left:110px;font-size:11.5px">Part Number /${esc(d.part)}</b>`:''}</div>
+<span style="font-size:13px"><b>Code client&nbsp;&nbsp; ${esc(d.code)}</b></span>${d.part?`<div style="margin-top:6px;font-size:11.5px"><b>Part Number /${esc(d.part)}</b></div>`:''}</div>
 <div class="fx"><div class="t">FACTURE</div><table>
 <tr><td>N° De Facture</td><td>${esc(d.num)}</td></tr><tr><td>Date</td><td>${esc(frDate(d.date))}</td></tr><tr><td>BC Client N°</td><td>${esc(d.bc)}</td></tr>
 <tr><td>Mode De livraison</td><td>${esc(d.incoterm)}</td></tr><tr><td>Mode De Paiement</td><td>${esc(d.paie)}</td></tr></table></div></div>
