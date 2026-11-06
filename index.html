@@ -542,11 +542,9 @@ async function mailDoc(){
   const t=totals(d),cur3=(d.dev||'EUR');
   const subj='Invoice & Delivery Note '+(d.num||'')+' – '+(d.client||'');
   const info=[['Invoice / Delivery Note No.',d.num],['Date',frDate(d.date)],['Customer',d.client],['Customer PO No.',d.bc],['Part Number',d.part],['Amount',fmt(t.net)+' '+cur3]].filter(x=>x[1]);
-  const body='Dear Shabeer,\n\nPlease find attached the requested file.\n\n'+info.map(x=>x[0]+' : '+x[1]).join('\n')+'\n\nShould you need any further information, please do not hesitate to contact me.\n\nBest regards,\n';
+  const body='Dear Shabeer,\n\nPlease find attached the requested file.\n';
   const F='font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#1f1f1f';
-  const html='<html><body style="'+F+'"><p style="margin:0 0 12px">Dear Shabeer,</p><p style="margin:0 0 14px">Please find attached the requested file.</p>'
-   +'<table cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 16px;'+F+'">'+info.map(x=>'<tr><td style="padding:5px 14px;background:#f2f5f9;border:1px solid #d9e0ea;font-weight:bold;white-space:nowrap">'+esc(x[0])+'</td><td style="padding:5px 14px;border:1px solid #d9e0ea">'+esc(x[1])+'</td></tr>').join('')+'</table>'
-   +'<p style="margin:0 0 14px">Should you need any further information, please do not hesitate to contact me.</p><p style="margin:0">Best regards,</p><br></body></html>';
+  const html='<html><body style="'+F+'"><p style="margin:0 0 12px">Dear Shabeer,</p><p style="margin:0">Please find attached the requested file.</p><br></body></html>';
   const files=[new File([fb],pdfName('fac',d),{type:'application/pdf'}),new File([bb],pdfName('bl',d),{type:'application/pdf'})];
   const mobile=/Android|iPhone|iPad/i.test(navigator.userAgent);
   if(mobile&&navigator.canShare&&navigator.canShare({files})){try{await navigator.share({files,title:subj,text:body});return}catch(e){if(e.name==='AbortError')return}}
