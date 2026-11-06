@@ -213,15 +213,15 @@ table.inf td:last-child{font-weight:700;min-width:110px}
     </div>
 
     <h3>Articles</h3>
-    <div class="lw"><table class="l lines"><thead><tr><th style="width:26%">Désignation</th><th>Lot N°</th><th style="width:70px">Unité</th><th class="n">Quantité</th><th class="n">Prix unitaire</th><th>Packing (BL)</th><th class="n">Montant H.T</th><th></th></tr></thead><tbody id="linesBody"></tbody></table></div>
+    <div class="lw"><table class="l lines"><thead><tr><th style="width:26%">Désignation</th><th>Lot N°</th><th style="width:70px">Unité</th><th class="n">Quantité</th><th class="n">Prix unitaire</th><th>Packing (BL)</th><th class="n" style="width:90px">Poids net (Kg)</th><th class="n" style="width:90px">Poids brut (Kg)</th><th class="n">Montant H.T</th><th></th></tr></thead><tbody id="linesBody"></tbody></table></div>
     <datalist id="artList"></datalist>
     <button style="margin-top:8px" onclick="addLine()">+ Ligne</button>
 
     <h3>Informations variables</h3>
     <div class="g g4">
       <div><label>Pays d'origine (Country of Origin)</label><input id="f_origin" placeholder="Germany"></div>
-      <div><label>Total quantité nette</label><input id="f_qnet" placeholder="1000Kgs"></div>
-      <div><label>Total quantité brute</label><input id="f_qbrut" placeholder="1050Kgs"></div>
+      <div><label>Total quantité nette (vide = somme des articles)</label><input id="f_qnet" placeholder="auto"></div>
+      <div><label>Total quantité brute (vide = somme des articles)</label><input id="f_qbrut" placeholder="auto"></div>
       <div><label>Colisage</label><input id="f_colis" placeholder="1 Octabin"></div>
       <div style="grid-column:span 4"><label>Autres remarques (facultatif, s'ajoutent sous le colisage)</label><textarea id="f_rem" rows="2"></textarea></div>
     </div>
@@ -426,6 +426,8 @@ function renderLines(){
   <td><input style="text-align:right" value="${esc(l.qty)}" oninput="cur.data.lines[${i}].qty=this.value;calc()"></td>
   <td><input style="text-align:right" value="${esc(l.pu)}" oninput="cur.data.lines[${i}].pu=this.value;calc()"></td>
   <td><input value="${esc(l.pack)}" oninput="cur.data.lines[${i}].pack=this.value"></td>
+  <td><input style="text-align:right" value="${esc(l.qn)}" placeholder="1000" oninput="cur.data.lines[${i}].qn=this.value"></td>
+  <td><input style="text-align:right" value="${esc(l.qb)}" placeholder="1050" oninput="cur.data.lines[${i}].qb=this.value"></td>
   <td class="n" id="lm${i}">${fmt(num(l.qty)*num(l.pu))}</td>
   <td><button class="d" onclick="cur.data.lines.splice(${i},1);if(!cur.data.lines.length)cur.data.lines.push({});renderLines();calc()">✕</button></td></tr>`).join('');
 }
@@ -483,8 +485,11 @@ function head(inv){return `<div class="hd ${inv?'inv':''}"><img class="rl" src="
 <div class="nm">${esc(S.name)}</div><div class="sm ${inv?'sm1':''}">${esc(S.act)}</div><div class="sm">${esc(S.grp)}<br>${esc(S.adr)}<br>${esc(S.ids)}<br>${esc(S.tel)}</div></div>`}
 function notesTxt(d,withOrigin){const a=[];if(withOrigin&&d.origin)a.push('Country of Origin of material : '+d.origin);
   if(d.qnet)a.push('Total Quantity net : '+d.qnet);if(d.qbrut)a.push('Total Quantity brut : '+d.qbrut);if(d.colis)a.push('Colisage : '+d.colis);if(d.rem)a.push(d.rem);return a.join('\n')}
+function kg(n){return (Math.round(n*1000)/1000).toLocaleString('en-US')+' Kgs'}
+function wSum(d,k){const L=(d.lines||[]).filter(l=>String(l[k]??'').trim()!=='');return L.length?kg(L.reduce((s,l)=>s+num(l[k]),0)):''}
+function wTxt(l){const a=[];if(String(l.qn??'').trim())a.push('Net : '+kg(num(l.qn)));if(String(l.qb??'').trim())a.push('Gross : '+kg(num(l.qb)));return a.join(' &nbsp;·&nbsp; ')}
 function infoBox(d,withPart){
-  const r=[];if(withPart&&d.part)r.push(['Part Number',d.part]);if(d.origin)r.push(['Country of Origin',d.origin]);if(d.qnet)r.push(['Total Quantity Net',d.qnet]);if(d.qbrut)r.push(['Total Quantity Gross',d.qbrut]);if(d.colis)r.push(['Colisage',d.colis]);
+  const r=[];if(withPart&&d.part)r.push(['Part Number',d.part]);if(d.origin)r.push(['Country of Origin',d.origin]);const qn=d.qnet||wSum(d,'qn'),qb=d.qbrut||wSum(d,'qb');if(qn)r.push(['Total Quantity Net',qn]);if(qb)r.push(['Total Quantity Gross',qb]);if(d.colis)r.push(['Colisage',d.colis]);
   return (r.length?'<table class="inf">'+r.map(x=>'<tr><td>'+esc(x[0])+'</td><td>'+esc(x[1])+'</td></tr>').join('')+'</table>':'')+(d.rem?'<div class="infr">'+esc(d.rem)+'</div>':'');
 }
 function pageBL(d){
@@ -500,9 +505,12 @@ function pageBL(d){
 <tr><td>Part Number&nbsp;:</td><td colspan="5">${esc(d.part)}</td></tr>
 <tr><td>Tel :</td><td>${esc(d.tel)}</td><td>Mobile :</td><td>${esc(d.mobile)}</td><td>Fax :</td><td>${esc(d.fax)}</td></tr></table>
 <div class="conf">NOUS CONFIRMONS LA RECEPTION DE LA MARCHANDISE CI-DESSOUS :</div>
-<table class="bl"><colgroup><col style="width:11%"><col style="width:33%"><col style="width:13%"><col style="width:13%"><col style="width:15%"><col style="width:15%"></colgroup>
-<tr><th>S.No.</th><th>DESCRIPTION</th><th>Lot Number</th><th>Nombre</th><th>Qte Globale</th><th>Packing Details</th></tr>
-${lines.map(l=>`<tr><td></td><td>${esc(l.des)}</td><td>${esc(l.lot)}</td><td style="text-align:center">${esc(l.unit)}</td><td style="text-align:center">${esc(l.qty)} ${esc((l.unit||'').toLowerCase())}</td><td style="text-align:center">${esc(l.pack)}</td></tr>`).join('')}</table>
+${(()=>{const W=lines.some(l=>String(l.qn??'').trim()||String(l.qb??'').trim());
+const cg=W?'<col style="width:7%"><col style="width:27%"><col style="width:12%"><col style="width:8%"><col style="width:12%"><col style="width:11%"><col style="width:11%"><col style="width:12%">':'<col style="width:11%"><col style="width:33%"><col style="width:13%"><col style="width:13%"><col style="width:15%"><col style="width:15%">';
+const c='style="text-align:center"';
+return `<table class="bl"><colgroup>${cg}</colgroup>
+<tr><th>S.No.</th><th>DESCRIPTION</th><th>Lot Number</th><th>Nombre</th><th>Qte Globale</th>${W?'<th>Net Weight</th><th>Gross Weight</th>':''}<th>Packing Details</th></tr>
+${lines.map(l=>`<tr><td></td><td>${esc(l.des)}</td><td>${esc(l.lot)}</td><td ${c}>${esc(l.unit)}</td><td ${c}>${esc(l.qty)} ${esc((l.unit||'').toLowerCase())}</td>${W?`<td ${c}>${String(l.qn??'').trim()?kg(num(l.qn)):''}</td><td ${c}>${String(l.qb??'').trim()?kg(num(l.qb)):''}</td>`:''}<td ${c}>${esc(l.pack)}</td></tr>`).join('')}</table>`})()}
 <div class="notes">${infoBox(d,false)}</div>
 <div class="sig">
 <div><div class="ln">Chargé par<span class="u"></span></div><div class="sub">(Sign,Date)</div></div>
@@ -523,7 +531,7 @@ function pageFac(d){
 <tr><td>Mode De livraison</td><td>${esc(d.incoterm)}</td></tr><tr><td>Mode De Paiement</td><td>${esc(d.paie)}</td></tr></table></div></div>
 <table class="it"><colgroup><col style="width:5%"><col style="width:37%"><col style="width:12%"><col style="width:6%"><col style="width:10%"><col style="width:12%"><col style="width:12%"></colgroup>
 <thead><tr><th>S.N°</th><th>Désignation</th><th>LOT N°</th><th>Unité</th><th>Quantité</th><th>Prix Unitaire</th><th>Montant H.T</th></tr></thead>
-<tbody>${lines.map(l=>`<tr><td></td><td style="padding-top:16px">${esc(l.des)}</td><td style="padding-top:16px">${esc(l.lot)}</td><td style="padding-top:16px">${esc(l.unit)}</td><td style="text-align:right;padding-top:16px">${fmt(num(l.qty))}</td><td style="padding-top:16px">${esc(l.pu)}</td><td style="padding-top:16px">${fmt(num(l.qty)*num(l.pu))}</td></tr>`).join('')}</tbody></table>
+<tbody>${lines.map(l=>`<tr><td></td><td style="padding-top:16px">${esc(l.des)}${wTxt(l)?`<div style="font-weight:400;font-size:9.5px;margin-top:3px">${wTxt(l)}</div>`:''}</td><td style="padding-top:16px">${esc(l.lot)}</td><td style="padding-top:16px">${esc(l.unit)}</td><td style="text-align:right;padding-top:16px">${fmt(num(l.qty))}</td><td style="padding-top:16px">${esc(l.pu)}</td><td style="padding-top:16px">${fmt(num(l.qty)*num(l.pu))}</td></tr>`).join('')}</tbody></table>
 <div class="ft"><div class="lf">${infoBox(d,true)}</div><div class="rt">
 <div><span>Total H.T :</span><span>${fmt(t.ht,3)}</span></div><div><span>${num(d.tva)?'TVA '+num(d.tva)+'% :':'-'}</span><span>${fmt(t.tva,3)}</span></div>
 <div><span>Total TTC :</span><span>${fmt(t.ttc,3)}</span></div><div><span>Transport :</span><span>${fmt(num(d.transport),3)}</span></div>
