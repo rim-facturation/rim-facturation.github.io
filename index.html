@@ -6,6 +6,7 @@
 <title>Facturation RIM</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
 :root{--bg:#f4f5f7;--card:#fff;--ink:#1d2330;--mut:#6b7280;--line:#dfe2e8;--acc:#1f4fa3;--acc2:#e3ecfb;--red:#c62828;--ok:#2e7d32}
 *{box-sizing:border-box}
@@ -50,6 +51,14 @@ h3{font-size:13px;margin:14px 0 8px;color:var(--acc);text-transform:uppercase;le
 .badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:11px;background:#eee}
 .scroll{max-height:60vh;overflow:auto}
 .lw{overflow-x:auto}
+.vbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.vbar button{padding:9px 16px;font-weight:600;border-radius:8px}
+.vbar button.g{background:#0f6b55;border-color:#0f6b55;color:#fff}
+.sheet{background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.15);padding:10mm;margin:0 auto 18px;width:210mm;overflow:hidden}
+.sheet .page{min-height:0}
+.vwrap{overflow-x:auto}
+#pdfBox{position:fixed;left:-10000px;top:0;background:#fff}
+#pdfBox .page{min-height:0}
 /* ---------- impression ---------- */
 #print{display:none}
 @media print{
@@ -145,6 +154,19 @@ table.it tbody tr:last-child td{border-bottom:1px solid #000;padding-bottom:16px
   </div>
 </section>
 
+<!-- APERCU -->
+<section id="t-view" class="hide">
+  <div class="vbar">
+    <button onclick="editCur()">Modifier</button>
+    <button onclick="printDoc('both')">Imprimer</button>
+    <button class="g" onclick="dlPdf('fac')">⬇ Télécharger Facture</button>
+    <button class="g" onclick="dlPdf('bl')">⬇ Télécharger BL</button>
+    <button class="g" onclick="mailDoc()">✉ Envoyer par e-mail</button>
+  </div>
+  <div class="vwrap" id="viewBox"></div>
+</section>
+<div id="pdfBox"></div>
+
 <!-- EDITEUR -->
 <section id="t-edit" class="hide">
   <div class="card">
@@ -172,6 +194,7 @@ table.it tbody tr:last-child td{border-bottom:1px solid #000;padding-bottom:16px
       <div><label>Code client</label><input id="f_code"></div>
       <div><label>ICE / Code TVA</label><input id="f_ice"></div>
       <div style="grid-column:span 2"><label>Nom du client</label><input id="f_client"></div>
+      <div style="grid-column:span 2"><label>E-mail du client (pour l'envoi)</label><input id="f_email" type="email" placeholder="client@exemple.com"></div>
       <div style="grid-column:span 2"><label>Adresse (facture — plusieurs lignes)</label><textarea id="f_adr" rows="3"></textarea></div>
       <div style="grid-column:span 2"><label>Adresse sur le BL (vide = 1ʳᵉ ligne(s) de l'adresse facture)</label><input id="f_adrBl"></div>
       <div><label>Tél</label><input id="f_tel"></div>
@@ -358,7 +381,7 @@ async function loadAll(){
 
 /* ---------- onglets ---------- */
 $('nav').onclick=e=>{const t=e.target.dataset.t;if(!t)return;if(t==='edit'&&!cur){newDoc();return}tab(t)};
-function tab(t){document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));['docs','edit','clients','articles','societe'].forEach(x=>$('t-'+x).classList.toggle('hide',x!==t));window.scrollTo(0,0)}
+function tab(t){document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));['docs','edit','view','clients','articles','societe'].forEach(x=>$('t-'+x).classList.toggle('hide',x!==t));window.scrollTo(0,0)}
 
 /* ---------- numérotation ---------- */
 function nextNum(){
@@ -369,12 +392,12 @@ function nextNum(){
 }
 
 /* ---------- documents ---------- */
-const F=['num','date','bc','entrepot','code','ice','client','adr','adrBl','tel','fax','mobile','part','incoterm','paie','dev','etab','origin','qnet','qbrut','colis','rem','tva','transport','timbre','remise'];
+const F=['num','date','bc','entrepot','code','ice','client','email','adr','adrBl','tel','fax','mobile','part','incoterm','paie','dev','etab','origin','qnet','qbrut','colis','rem','tva','transport','timbre','remise'];
 function newDoc(){
   cur={id:null,data:{num:nextNum(),date:new Date().toISOString().slice(0,10),entrepot:S.entrepot,dev:S.dev,tva:S.tva,transport:0,timbre:0,remise:0,lines:[{}]}};
   loadDocForm();tab('edit');
 }
-function openDoc(id){const d=docs.find(x=>x.id===id);cur={id:d.id,data:JSON.parse(JSON.stringify(d.data))};cur.data.num=d.num;loadDocForm();tab('edit')}
+function openDoc(id){const d=docs.find(x=>x.id===id);cur={id:d.id,data:JSON.parse(JSON.stringify(d.data))};cur.data.num=d.num;loadDocForm();showView()}
 function dupDoc(id){const d=docs.find(x=>x.id===id);cur={id:null,data:JSON.parse(JSON.stringify(d.data))};cur.data.num=nextNum();cur.data.date=new Date().toISOString().slice(0,10);loadDocForm();tab('edit');toast('Copie créée — n\'oubliez pas d\'enregistrer')}
 async function delDoc(id){const d=docs.find(x=>x.id===id);if(!confirm('Supprimer '+d.num+' ?'))return;await sb.from('records').delete().eq('id',id);toast('Supprimé');loadAll()}
 function loadDocForm(){
@@ -422,7 +445,7 @@ async function saveDoc(){
   if(cur.id)res=await sb.from('records').update({num:n,data}).eq('id',cur.id).select().single();
   else res=await sb.from('records').insert({kind:'doc',num:n,data}).select().single();
   if(res.error){toast(/duplicate|unique/i.test(res.error.message)?'Ce numéro existe déjà':'Erreur: '+res.error.message);return}
-  cur.id=res.data.id;$('edTitle').textContent='Modifier '+n;toast('Enregistré ✓');loadAll();
+  cur.id=res.data.id;$('edTitle').textContent='Modifier '+n;toast('Enregistré ✓');loadAll();showView();
 }
 function renderDocs(){
   const q=($('qDocs').value||'').toLowerCase();
@@ -499,6 +522,30 @@ function pageFac(d){
 <div class="net"><div><span>Net à Payer :&nbsp; ${esc(D[0])}</span><span>${fmt(t.net)}</span></div></div>
 <div class="lettres">${esc(lettres(t.net,d.dev))}</div>
 <div class="eta"><i>Reçue Par :</i><span style="text-align:left;width:230px"><i>Etablie Par :</i><br>${esc(d.etab)}</span></div></div>`;
+}
+function curDoc(){const d=readForm();d.lines=cur.data.lines;return d}
+function showView(){const d=curDoc();$('viewBox').innerHTML='<div class="sheet">'+pageFac(d)+'</div><div class="sheet">'+pageBL(d)+'</div>';tab('view')}
+function editCur(){loadDocForm();tab('edit')}
+function pdfName(w,d){return (w==='bl'?'BL-':'INVOICE-')+(d.num||'').slice(-4)+'-'+(d.date||'').slice(0,4)+'-'+(d.client||'').replace(/[\\/:*?"<>|]/g,'')+'.pdf'}
+async function pdfBlob(w,d){
+  if(!window.html2pdf){toast('Chargement PDF impossible, vérifiez Internet');throw new Error('html2pdf')}
+  const box=$('pdfBox');box.innerHTML=w==='bl'?pageBL(d):pageFac(d);const el=box.firstElementChild;
+  try{return await html2pdf().set({margin:10,image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,backgroundColor:'#fff'},jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},pagebreak:{mode:['css']}}).from(el).outputPdf('blob')}
+  finally{box.innerHTML=''}
+}
+function saveBlob(b,name){const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)}
+async function dlPdf(w){const d=curDoc();toast('Préparation du PDF…');try{saveBlob(await pdfBlob(w,d),pdfName(w,d))}catch(e){console.error(e)}}
+async function mailDoc(){
+  const d=curDoc();toast('Préparation des PDF…');let fb,bb;
+  try{fb=await pdfBlob('fac',d);bb=await pdfBlob('bl',d)}catch(e){console.error(e);return}
+  const subj='Facture et BL '+(d.num||'')+' — '+(S.name||'');
+  const body='Bonjour,\n\nVeuillez trouver ci-joint la facture et le bon de livraison N° '+(d.num||'')+' du '+frDate(d.date)+'.\n\nCordialement,\n'+(d.etab||'')+'\n'+(S.name||'');
+  const files=[new File([fb],pdfName('fac',d),{type:'application/pdf'}),new File([bb],pdfName('bl',d),{type:'application/pdf'})];
+  const mobile=/Android|iPhone|iPad/i.test(navigator.userAgent);
+  if(mobile&&navigator.canShare&&navigator.canShare({files})){try{await navigator.share({files,title:subj,text:body});return}catch(e){if(e.name==='AbortError')return}}
+  files.forEach(f=>saveBlob(f,f.name));
+  setTimeout(()=>{location.href='mailto:'+encodeURIComponent(d.email||'')+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body)},600);
+  toast('Les 2 PDF sont téléchargés — joignez-les à l\'e-mail');
 }
 function printDoc(w){
   const d=readForm();d.lines=cur.data.lines;
